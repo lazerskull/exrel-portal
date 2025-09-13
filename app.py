@@ -32,27 +32,21 @@ def jotform_get():
 @app.route("/jotform", methods=["POST"])
 def jotform_webhook():
     try:
-        # Log the raw payload
-        print("=== Raw POST payload ===")
-        print("request.data:", request.data)
-        print("request.form:", request.form)
-        print("request.json:", request.get_json(silent=True))
+        # Get Jotform payload
+        data = request.get_json(force=True)
 
-        # Try JSON first, fallback to form data
-        data = request.get_json(silent=True)
-        if data:
-            # Handle JSON payload
-            form_data = data.get("request", {}).get("rawRequest")
-            if form_data:
-                form_data = json.loads(form_data)
-            else:
-                form_data = data
+        # Log the raw payload for debugging
+        print("Raw Jotform payload:", json.dumps(data, indent=2))
+
+        # Some JotForm payloads use rawRequest
+        form_data = {}
+        if "rawRequest" in data.get("request", {}):
+            form_data = json.loads(data["request"]["rawRequest"])
         else:
-            # Handle form-encoded submission
-            form_data = request.form.to_dict()
+            form_data = data  # fallback if no rawRequest
 
         # === Extract fields ===
-        name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}" if isinstance(form_data.get('q3_name'), dict) else form_data.get('q3_name', 'N/A')
+        name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}"
         id_number = form_data.get("q7_idNumber", "N/A")
         department = form_data.get("q57_department57", "N/A")
         project = form_data.get("q9_project", "N/A")
@@ -92,8 +86,24 @@ def jotform_webhook():
         print("Error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# === Test route to simulate Jotform submissions ===
+@app.route("/test-jotform/<service_name>", methods=["GET"])
+def test_jotform(service_name):
+    simulated_form = {
+        "q3_name": {"first": "Test", "last": "User"},
+        "q7_idNumber": "12345",
+        "q57_department57": "IT",
+        "q9_project": "Demo Project",
+        "q10_telegramHandle": "@testuser",
+        "q12_serviceTo": service_name
+    }
 
+    # Call the same webhook logic directly
+    with app.test_request_context(
+        "/jotform", method="POST", json=simulated_form
+    ):
+        return jotform_webhook()
+
+# === Run server ===
 if __name__ == "__main__":
-    # Render sets the PORT environment variable automatically
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000)
