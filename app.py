@@ -89,7 +89,10 @@ def jotform_webhook():
             message += f"\n(Optional) Specific instructions or concerns regarding the checking: {safe_get(form_data, 'q24_optionalPlease')}"
         elif service_to_avail == "Partnerships IC":
             message += f"\nw2m link: {safe_get(form_data, 'q56_w2mLink')}"
-            message += f"\nPlease select IC with: {safe_get(form_data, 'pleaseSelect')}"
+            ic_selected = form_data.get('q64_pleaseSelect', [])
+            if isinstance(ic_selected, list):
+                ic_selected = ', '.join(ic_selected)
+            message += f"\nPlease select IC with: {ic_selected}"
             message += f"\nReason: {safe_get(form_data, 'q62_pleaseBriefly')}"
         elif service_to_avail == "Partnerships Request":
             message += f"\nType of Partnerships Service: {safe_get(form_data, 'q59_typeOf59')}"
