@@ -32,25 +32,22 @@ def jotform_get():
 @app.route("/jotform", methods=["POST"])
 def jotform_webhook():
     try:
-        # Handle JSON or form-encoded submissions
-        if request.is_json:
-            data = request.get_json()
-        else:
-            data = request.form.to_dict()
+        # Handle JSON submission
+        data = request.get_json(force=True)
 
-        # Log the raw payload for debugging
-        print("=== RAW JOTFORM PAYLOAD ===")
-        print(json.dumps(data, indent=2))
-        print("===========================")
-
-        # Extract form data
-        form_data = {}
-        if "request" in data and "rawRequest" in data["request"]:
-            form_data = json.loads(data["request"]["rawRequest"])
+        # Parse rawRequest if it exists
+        raw_request = data.get("rawRequest") or data.get("request", {}).get("rawRequest")
+        if raw_request:
+            form_data = json.loads(raw_request)
         else:
             form_data = data
 
-        # Common fields
+        # Log for debugging
+        print("=== PARSED JOTFORM DATA ===")
+        print(json.dumps(form_data, indent=2))
+        print("===========================")
+
+        # === Common fields ===
         name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}"
         id_number = form_data.get("q7_idNumber", "N/A")
         department = form_data.get("q57_department57", "N/A")
@@ -60,7 +57,7 @@ def jotform_webhook():
 
         topic_id = TOPIC_MAP.get(service_to_avail)
 
-        # Start message
+        # === Build service-specific message ===
         message = (
             f"📩 *New Request Submission*\n\n"
             f"👤 Name: {name}\n"
@@ -71,43 +68,27 @@ def jotform_webhook():
             f"🛠 Service: {service_to_avail}"
         )
 
-        # === Service-specific fields ===
+        # Service-specific additions
         if service_to_avail == "Alumni Relations":
-            kindly_state = form_data.get("q19_kindlyState", "")
-            if kindly_state:
-                message += f"\n\nKindly state below your alumni relations request or concerns & how you want it to be delivered:\n{kindly_state}"
-
+            message += "\nKindly state below your alumni relations request or concerns & how you want it to be delivered:\n"
+            message += form_data.get("q19_kindlyState", "")
         elif service_to_avail == "Document Checking":
-            doc_file = form_data.get("document upload", "No file provided")
-            optional_instructions = form_data.get("q24_optionalPlease", "")
-            
-            # If doc_file looks like a URL, format as clickable link in Telegram
-            if doc_file.startswith("http://") or doc_file.startswith("https://"):
-                doc_display = f"[Download File]({doc_file})"
-            else:
-                doc_display = doc_file
-            
-            message += f"\n\nDocument Upload: {doc_display}"
-            if optional_instructions:
-                message += f"\n(Optional) Instructions/Concerns:\n{optional_instructions}"
-
+            # File uploads in JotForm come as URLs in the submission
+            file_url = form_data.get("document upload", "")
+            message += f"\nDocument Upload: {file_url}"
+            message += "\n(Optional) Please input specific instructions or concerns regarding the checking of the uploaded document/s:\n"
+            message += form_data.get("q24_optionalPlease", "")
         elif service_to_avail == "Partnerships IC":
-            w2m_link = form_data.get("q56_w2mLink", "")
-            ic_with = form_data.get("pleaseSelect", "")  # could be list if multiple
-            reason = form_data.get("q62_pleaseBriefly", "")
-            if isinstance(ic_with, list):
-                ic_with = ", ".join(ic_with)
-            message += f"\n\nw2m link: {w2m_link}"
-            message += f"\nPlease select who you would like to set an IC with: {ic_with}"
-            message += f"\nPlease briefly indicate your reason for requesting an IC:\n{reason}"
-
+            message += f"\nw2m link: {form_data.get('q56_w2mLink', '')}"
+            # Multiple-choice field for IC participants
+            selected_ic = form_data.get("pleaseSelect", "")
+            message += f"\nPlease select who you would like to set an IC with: {selected_ic}"
+            message += f"\nPlease briefly indicate your reason for requesting an IC: {form_data.get('q62_pleaseBriefly', '')}"
         elif service_to_avail == "Partnerships Request":
-            service_type = form_data.get("q59_typeOf59", "")
-            details = form_data.get("q30_partnershipDetails", "")
-            message += f"\n\nType of Partnerships Service: {service_type}"
-            message += f"\nPartnership Details: {details}"
+            message += f"\nType of Partnerships Service: {form_data.get('q59_typeOf59', '')}"
+            message += f"\nPartnership Details: {form_data.get('q30_partnershipDetails', '')}"
 
-        # Send to Telegram
+        # === Send to Telegram ===
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         payload = {
             "chat_id": CHAT_ID,
@@ -126,7 +107,6 @@ def jotform_webhook():
         print("Error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))  # Use Render's assigned port
+    port = int(os.getenv("PORT", 5000))  # Render assigns PORT
     app.run(host="0.0.0.0", port=port)
