@@ -32,22 +32,27 @@ def jotform_get():
 @app.route("/jotform", methods=["POST"])
 def jotform_webhook():
     try:
-        data = request.get_json(force=True)
-        print("Incoming JotForm data:", json.dumps(data, indent=2))  # Debug payload
+        # Log the raw payload
+        print("=== Raw POST payload ===")
+        print("request.data:", request.data)
+        print("request.form:", request.form)
+        print("request.json:", request.get_json(silent=True))
 
-        # Handle rawRequest or normal payload
-        form_data = {}
-        if "request" in data and "rawRequest" in data["request"]:
-            form_data = json.loads(data["request"]["rawRequest"])
+        # Try JSON first, fallback to form data
+        data = request.get_json(silent=True)
+        if data:
+            # Handle JSON payload
+            form_data = data.get("request", {}).get("rawRequest")
+            if form_data:
+                form_data = json.loads(form_data)
+            else:
+                form_data = data
         else:
-            form_data = data
+            # Handle form-encoded submission
+            form_data = request.form.to_dict()
 
-        # === Safely extract fields ===
-        name_field = form_data.get('q3_name', {})
-        first_name = name_field.get('first', '')
-        last_name = name_field.get('last', '')
-        name = f"{first_name} {last_name}".strip()
-
+        # === Extract fields ===
+        name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}" if isinstance(form_data.get('q3_name'), dict) else form_data.get('q3_name', 'N/A')
         id_number = form_data.get("q7_idNumber", "N/A")
         department = form_data.get("q57_department57", "N/A")
         project = form_data.get("q9_project", "N/A")
@@ -57,7 +62,7 @@ def jotform_webhook():
         # Pick topic ID based on service
         topic_id = TOPIC_MAP.get(service_to_avail)
 
-        # === Format Telegram message ===
+        # === Format message ===
         message = (
             f"📩 *New Request Submission*\n\n"
             f"👤 Name: {name}\n"
@@ -87,8 +92,8 @@ def jotform_webhook():
         print("Error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# === Run on Render dynamic port ===
+
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))
+    # Render sets the PORT environment variable automatically
+    port = int(os.getenv("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
