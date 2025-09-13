@@ -32,18 +32,22 @@ def jotform_get():
 @app.route("/jotform", methods=["POST"])
 def jotform_webhook():
     try:
-        # Get Jotform payload
         data = request.get_json(force=True)
+        print("Incoming JotForm data:", json.dumps(data, indent=2))  # Debug payload
 
-        # Some JotForm payloads use rawRequest
+        # Handle rawRequest or normal payload
         form_data = {}
-        if "rawRequest" in data.get("request", {}):
+        if "request" in data and "rawRequest" in data["request"]:
             form_data = json.loads(data["request"]["rawRequest"])
         else:
-            form_data = data  # fallback if no rawRequest
+            form_data = data
 
-        # === Extract fields ===
-        name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}"
+        # === Safely extract fields ===
+        name_field = form_data.get('q3_name', {})
+        first_name = name_field.get('first', '')
+        last_name = name_field.get('last', '')
+        name = f"{first_name} {last_name}".strip()
+
         id_number = form_data.get("q7_idNumber", "N/A")
         department = form_data.get("q57_department57", "N/A")
         project = form_data.get("q9_project", "N/A")
@@ -53,7 +57,7 @@ def jotform_webhook():
         # Pick topic ID based on service
         topic_id = TOPIC_MAP.get(service_to_avail)
 
-        # === Format message ===
+        # === Format Telegram message ===
         message = (
             f"📩 *New Request Submission*\n\n"
             f"👤 Name: {name}\n"
@@ -83,6 +87,7 @@ def jotform_webhook():
         print("Error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
+# === Run on Render dynamic port ===
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
