@@ -43,15 +43,17 @@ def jotform_webhook():
         print(json.dumps(data, indent=2))
         print("===========================")
 
-        # Some JotForm payloads use rawRequest
-        form_data = {}
-        if "request" in data and "rawRequest" in data["request"]:
-            form_data = json.loads(data["request"]["rawRequest"])
+        # Parse rawRequest if present
+        if "rawRequest" in data:
+            form_data = json.loads(data["rawRequest"])
         else:
-            form_data = data  # fallback
+            form_data = data
 
-        # === Extract fields ===
-        name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}"
+        # === Extract fields safely ===
+        first_name = form_data.get('q3_name', {}).get('first', '')
+        last_name = form_data.get('q3_name', {}).get('last', '')
+        name = f"{first_name} {last_name}".strip() or "N/A"
+
         id_number = form_data.get("q7_idNumber", "N/A")
         department = form_data.get("q57_department57", "N/A")
         project = form_data.get("q9_project", "N/A")
@@ -80,6 +82,7 @@ def jotform_webhook():
             "parse_mode": "Markdown"
         }
         if topic_id:
+            # Send to specific thread if topic ID exists
             payload["message_thread_id"] = topic_id
 
         response = requests.post(url, json=payload)
@@ -95,4 +98,3 @@ def jotform_webhook():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))  # Use Render's assigned port
     app.run(host="0.0.0.0", port=port)
-
