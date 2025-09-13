@@ -18,7 +18,17 @@ TOPIC_MAP = {
     "Partnerships Request": int(os.getenv("TOPIC_ID_REQUEST", 0))
 }
 
+# === Root route for health check ===
+@app.route("/")
+def home():
+    return "🚀 Jotform → Telegram bot is running!", 200
 
+# === GET route for /jotform to test in browser ===
+@app.route("/jotform", methods=["GET"])
+def jotform_get():
+    return "🚀 Jotform webhook endpoint. Use POST to submit data.", 200
+
+# === POST route for Jotform submissions ===
 @app.route("/jotform", methods=["POST"])
 def jotform_webhook():
     try:
@@ -29,8 +39,10 @@ def jotform_webhook():
         form_data = {}
         if "rawRequest" in data.get("request", {}):
             form_data = json.loads(data["request"]["rawRequest"])
+        else:
+            form_data = data  # fallback if no rawRequest
 
-        # === Extract fields (adjust keys based on your JotForm) ===
+        # === Extract fields ===
         name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}"
         id_number = form_data.get("q7_idNumber", "N/A")
         department = form_data.get("q57_department57", "N/A")
