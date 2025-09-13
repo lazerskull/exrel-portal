@@ -35,8 +35,10 @@ def jotform_webhook():
         # Get Jotform payload
         data = request.get_json(force=True)
 
-        # Log the raw payload for debugging
-        print("Raw Jotform payload:", json.dumps(data, indent=2))
+        # === Log raw payload for debugging ===
+        print("=== RAW JOTFORM PAYLOAD ===")
+        print(json.dumps(data, indent=2))
+        print("===========================")
 
         # Some JotForm payloads use rawRequest
         form_data = {}
@@ -86,24 +88,5 @@ def jotform_webhook():
         print("Error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# === Test route to simulate Jotform submissions ===
-@app.route("/test-jotform/<service_name>", methods=["GET"])
-def test_jotform(service_name):
-    simulated_form = {
-        "q3_name": {"first": "Test", "last": "User"},
-        "q7_idNumber": "12345",
-        "q57_department57": "IT",
-        "q9_project": "Demo Project",
-        "q10_telegramHandle": "@testuser",
-        "q12_serviceTo": service_name
-    }
-
-    # Call the same webhook logic directly
-    with app.test_request_context(
-        "/jotform", method="POST", json=simulated_form
-    ):
-        return jotform_webhook()
-
-# === Run server ===
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
