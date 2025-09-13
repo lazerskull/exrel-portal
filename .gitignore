@@ -1,0 +1,11 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+*.vsix
+
+# Installers and temp files
+*.exe
+scoped_dir*/
