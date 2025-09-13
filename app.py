@@ -32,20 +32,23 @@ def jotform_get():
 @app.route("/jotform", methods=["POST"])
 def jotform_webhook():
     try:
-        # Get Jotform payload
-        data = request.get_json(force=True)
+        # Handle JSON or form-encoded submissions
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()
 
-        # === Log raw payload for debugging ===
+        # Log the raw payload for debugging
         print("=== RAW JOTFORM PAYLOAD ===")
         print(json.dumps(data, indent=2))
         print("===========================")
 
         # Some JotForm payloads use rawRequest
         form_data = {}
-        if "rawRequest" in data.get("request", {}):
+        if "request" in data and "rawRequest" in data["request"]:
             form_data = json.loads(data["request"]["rawRequest"])
         else:
-            form_data = data  # fallback if no rawRequest
+            form_data = data  # fallback
 
         # === Extract fields ===
         name = f"{form_data.get('q3_name', {}).get('first','')} {form_data.get('q3_name', {}).get('last','')}"
@@ -87,6 +90,7 @@ def jotform_webhook():
     except Exception as e:
         print("Error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
