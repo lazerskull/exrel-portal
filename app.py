@@ -102,7 +102,7 @@ def jotform_webhook():
         payload = {
             "chat_id": CHAT_ID,
             "text": message,
-            "parse_mode": "Markdown"
+            "parse_mode": "HTML"
         }
         if topic_id:
             payload["message_thread_id"] = topic_id
